@@ -5,76 +5,83 @@ import datetime
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.models import Match, MatchStatus, RatingHistory, User
-from rating.glicko2 import DEFAULT_RATING, DEFAULT_RD, DEFAULT_SIGMA, PlayerRating, update_match
+from models.models import Match, MatchStatus, RatingHistory, User, UserRating
+from rating.glicko2 import PlayerRating, conservative_rating, update_match
+
+GAME_TYPES = ("moscow", "america")
 
 
 async def rebuild_all_ratings(session: AsyncSession) -> None:
     """Полный пересчёт рейтингов всех игроков с нуля по истории confirmed-матчей.
 
-    Используется после /score, /cancel и /editmatch — самый надёжный способ
-    корректно пересчитать "всю последующую историю" для затронутых игроков,
-    не гадая, какие именно матчи и в каком порядке нужно частично пересчитать.
-    Матчи внутри одной сессии /score применяются в порядке ``sequence``.
+    Рейтинг ведётся отдельно и независимо по каждому типу игры (Москва/Америка) —
+    у игрока может быть разная сила в разных типах. Используется после /score,
+    /cancel и /editmatch — самый надёжный способ корректно пересчитать "всю
+    последующую историю" для затронутых игроков, не гадая, какие именно матчи
+    и в каком порядке нужно частично пересчитать. Матчи внутри одной сессии
+    /score применяются в порядке ``sequence``.
     """
     users_result = await session.execute(select(User))
-    users = {u.telegram_id: u for u in users_result.scalars().all()}
+    user_ids = [u.telegram_id for u in users_result.scalars().all()]
 
-    for user in users.values():
-        user.rating = DEFAULT_RATING
-        user.rd = DEFAULT_RD
-        user.sigma = DEFAULT_SIGMA
-        user.last_match_at = None
-
+    await session.execute(delete(UserRating))
     await session.execute(delete(RatingHistory))
 
-    stmt = (
-        select(Match)
-        .where(Match.status == MatchStatus.CONFIRMED.value)
-        .order_by(Match.confirmed_at.asc(), Match.session_id.asc(), Match.sequence.asc(), Match.id.asc())
-    )
-    result = await session.execute(stmt)
-    matches = list(result.scalars().all())
+    for game_type in GAME_TYPES:
+        pools = {uid: PlayerRating() for uid in user_ids}
+        last_match_at: dict[int, datetime.datetime | None] = {uid: None for uid in user_ids}
 
-    for match in matches:
-        p1 = users.get(match.player1_id)
-        p2 = users.get(match.player2_id)
-        if p1 is None or p2 is None:
-            continue
-
-        before1 = PlayerRating(rating=p1.rating, rd=p1.rd, sigma=p1.sigma)
-        before2 = PlayerRating(rating=p2.rating, rd=p2.rd, sigma=p2.sigma)
-
-        days1 = _days_between(p1.last_match_at, match.confirmed_at)
-        days2 = _days_between(p2.last_match_at, match.confirmed_at)
-
-        after1, after2 = update_match(
-            before1, before2, match.score1, match.score2,
-            days_since_p1_last_match=days1,
-            days_since_p2_last_match=days2,
+        stmt = (
+            select(Match)
+            .where(Match.status == MatchStatus.CONFIRMED.value, Match.game_type == game_type)
+            .order_by(Match.confirmed_at.asc(), Match.session_id.asc(), Match.sequence.asc(), Match.id.asc())
         )
+        matches = (await session.execute(stmt)).scalars().all()
 
-        p1.rating, p1.rd, p1.sigma = after1.rating, after1.rd, after1.sigma
-        p2.rating, p2.rd, p2.sigma = after2.rating, after2.rd, after2.sigma
-        p1.last_match_at = match.confirmed_at
-        p2.last_match_at = match.confirmed_at
+        for match in matches:
+            if match.player1_id not in pools or match.player2_id not in pools:
+                continue
 
-        session.add(
-            RatingHistory(
-                match_id=match.id,
-                user_id=p1.telegram_id,
-                rating_before=before1.rating, rd_before=before1.rd, sigma_before=before1.sigma,
-                rating_after=after1.rating, rd_after=after1.rd, sigma_after=after1.sigma,
+            before1, before2 = pools[match.player1_id], pools[match.player2_id]
+            days1 = _days_between(last_match_at[match.player1_id], match.confirmed_at)
+            days2 = _days_between(last_match_at[match.player2_id], match.confirmed_at)
+
+            after1, after2 = update_match(
+                before1, before2, match.score1, match.score2,
+                days_since_p1_last_match=days1,
+                days_since_p2_last_match=days2,
             )
-        )
-        session.add(
-            RatingHistory(
-                match_id=match.id,
-                user_id=p2.telegram_id,
-                rating_before=before2.rating, rd_before=before2.rd, sigma_before=before2.sigma,
-                rating_after=after2.rating, rd_after=after2.rd, sigma_after=after2.sigma,
+
+            pools[match.player1_id], pools[match.player2_id] = after1, after2
+            last_match_at[match.player1_id] = match.confirmed_at
+            last_match_at[match.player2_id] = match.confirmed_at
+
+            session.add(
+                RatingHistory(
+                    match_id=match.id,
+                    user_id=match.player1_id,
+                    rating_before=before1.rating, rd_before=before1.rd, sigma_before=before1.sigma,
+                    rating_after=after1.rating, rd_after=after1.rd, sigma_after=after1.sigma,
+                )
             )
-        )
+            session.add(
+                RatingHistory(
+                    match_id=match.id,
+                    user_id=match.player2_id,
+                    rating_before=before2.rating, rd_before=before2.rd, sigma_before=before2.sigma,
+                    rating_after=after2.rating, rd_after=after2.rd, sigma_after=after2.sigma,
+                )
+            )
+
+        for uid, pr in pools.items():
+            session.add(
+                UserRating(
+                    user_id=uid,
+                    game_type=game_type,
+                    rating=pr.rating, rd=pr.rd, sigma=pr.sigma,
+                    last_match_at=last_match_at[uid],
+                )
+            )
 
     await session.commit()
 
@@ -104,3 +111,34 @@ async def get_rating_deltas_for_session(session: AsyncSession, session_id: str) 
         h2 = (await session.execute(h2_stmt)).scalar_one_or_none()
         output.append((match, h1, h2))
     return output
+
+
+async def get_ranked_users(session: AsyncSession, game_type: str) -> list[tuple[User, UserRating | None]]:
+    """Активные игроки с рейтингом по конкретному типу игры, по убыванию Elo.
+
+    LEFT JOIN, а не INNER: игрок, только что добавленный админом, ещё не имеет
+    строки UserRating (она появляется при первом /score где-либо в системе) —
+    такой игрок всё равно должен быть виден в /top со стартовым рейтингом.
+    """
+    stmt = (
+        select(User, UserRating)
+        .outerjoin(
+            UserRating,
+            (UserRating.user_id == User.telegram_id) & (UserRating.game_type == game_type),
+        )
+        .where(User.is_active.is_(True))
+    )
+    rows = (await session.execute(stmt)).all()
+
+    def _cr(row: tuple[User, UserRating | None]) -> float:
+        ur = row[1]
+        return conservative_rating(PlayerRating(rating=ur.rating, rd=ur.rd) if ur else PlayerRating())
+
+    return sorted(rows, key=_cr, reverse=True)
+
+
+async def get_user_ratings(session: AsyncSession, user_id: int) -> dict[str, UserRating]:
+    """Оба рейтинга игрока (Москва/Америка) по telegram_id."""
+    stmt = select(UserRating).where(UserRating.user_id == user_id)
+    rows = (await session.execute(stmt)).scalars().all()
+    return {r.game_type: r for r in rows}

@@ -18,7 +18,7 @@ async def cmd_history(message: Message) -> None:
     if requester is None:
         return
 
-    if not args or not args[0].startswith("@"):
+    if not args:
         await message.answer("Формат: /history @игрок")
         return
 

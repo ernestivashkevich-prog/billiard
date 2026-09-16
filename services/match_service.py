@@ -156,6 +156,21 @@ async def get_head_to_head(session: AsyncSession, user_a: int, user_b: int) -> l
     return list(result.scalars().all())
 
 
+async def get_win_loss_counts_by_type(session: AsyncSession, game_type: str) -> dict[int, tuple[int, int]]:
+    """W/L каждого игрока по подтверждённым партиям одного типа игры (для /top)."""
+    stmt = select(Match).where(Match.status == MatchStatus.CONFIRMED.value, Match.game_type == game_type)
+    matches = (await session.execute(stmt)).scalars().all()
+
+    counts: dict[int, list[int]] = {}
+    for m in matches:
+        counts.setdefault(m.player1_id, [0, 0])
+        counts.setdefault(m.player2_id, [0, 0])
+        winner, loser = (m.player1_id, m.player2_id) if m.score1 > m.score2 else (m.player2_id, m.player1_id)
+        counts[winner][0] += 1
+        counts[loser][1] += 1
+    return {uid: (w, l) for uid, (w, l) in counts.items()}
+
+
 async def get_user_matches(session: AsyncSession, user_id: int, limit: int = 5) -> list[Match]:
     stmt = (
         select(Match)

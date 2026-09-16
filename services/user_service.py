@@ -85,9 +85,3 @@ async def remove_from_whitelist(session: AsyncSession, telegram_id: int) -> bool
     user.is_active = False
     await session.commit()
     return True
-
-
-async def list_active_users(session: AsyncSession) -> list[User]:
-    stmt = select(User).where(User.is_active.is_(True))
-    result = await session.execute(stmt)
-    return list(result.scalars().all())

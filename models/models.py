@@ -30,15 +30,10 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    rating: Mapped[float] = mapped_column(Float, default=DEFAULT_RATING, nullable=False)
-    rd: Mapped[float] = mapped_column(Float, default=DEFAULT_RD, nullable=False)
-    sigma: Mapped[float] = mapped_column(Float, default=DEFAULT_SIGMA, nullable=False)
-
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     registered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    last_match_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def display(self) -> str:
@@ -51,6 +46,21 @@ class User(Base):
     def mention(self) -> str:
         """HTML-ссылка на профиль пользователя (кликабельное упоминание в группе)."""
         return f'<a href="tg://user?id={self.telegram_id}">{html.escape(self.display())}</a>'
+
+
+class UserRating(Base):
+    """Рейтинг игрока по одному типу игры (moscow/america) — независимые пулы Glicko-2."""
+
+    __tablename__ = "user_ratings"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), primary_key=True)
+    game_type: Mapped[str] = mapped_column(String(16), primary_key=True)
+
+    rating: Mapped[float] = mapped_column(Float, default=DEFAULT_RATING, nullable=False)
+    rd: Mapped[float] = mapped_column(Float, default=DEFAULT_RD, nullable=False)
+    sigma: Mapped[float] = mapped_column(Float, default=DEFAULT_SIGMA, nullable=False)
+
+    last_match_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Match(Base):
