@@ -29,7 +29,7 @@ async def cmd_adduser(message: Message) -> None:
 
     args = message.text.split()[1:] if message.text else []
     if not args or not args[0].lstrip("-").isdigit():
-        await message.answer("Формат: /adduser <telegram_id> [имя]")
+        await message.answer("Формат: /adduser «telegram_id» [имя]")
         return
 
     telegram_id = int(args[0])
@@ -50,7 +50,7 @@ async def cmd_removeuser(message: Message) -> None:
 
     args = message.text.split()[1:] if message.text else []
     if not args or not args[0].lstrip("-").isdigit():
-        await message.answer("Формат: /removeuser <telegram_id>")
+        await message.answer("Формат: /removeuser «telegram_id»")
         return
 
     telegram_id = int(args[0])
@@ -73,8 +73,8 @@ async def cmd_editmatch(message: Message) -> None:
     args = message.text.split()[1:] if message.text else []
     if len(args) < 2 or not args[0].isdigit():
         await message.answer(
-            "Формат: /editmatch <match_id> X:Y — исправить счёт\n"
-            "/editmatch <match_id> delete — удалить матч"
+            "Формат: /editmatch «match_id» X:Y — исправить счёт\n"
+            "/editmatch «match_id» delete — удалить матч"
         )
         return
 

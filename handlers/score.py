@@ -21,7 +21,7 @@ from services.user_service import get_user_by_username
 router = Router(name="score")
 
 _USAGE = (
-    "Формат: /score @игрок1 @игрок2 <тип> <счёт партий> <счёт1> [<счёт2> ...]\n"
+    "Формат: /score @игрок1 @игрок2 «тип» «счёт партий» «счёт1» [«счёт2» ...]\n"
     "тип — moscow/москва или america/америка\n"
     "Например: /score @alex @petya moscow 2:0 8:7 8:6"
 )
