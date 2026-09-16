@@ -1,6 +1,6 @@
 from aiogram import Dispatcher
 
-from handlers import admin, cancel, faq, history, score, start, stats, top
+from handlers import admin, cancel, details, faq, history, score, start, stats, top
 from handlers.middleware import GroupOnlyMiddleware, WhitelistMiddleware
 
 
@@ -16,5 +16,6 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.include_router(top.router)
     dp.include_router(stats.router)
     dp.include_router(history.router)
+    dp.include_router(details.router)
     dp.include_router(faq.router)
     dp.include_router(admin.router)

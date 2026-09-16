@@ -41,10 +41,7 @@ async def cmd_stats(message: Message) -> None:
             cr = conservative_rating(player)
             wl = await get_win_loss_counts_by_type(session, game_type)
             wins, losses = wl.get(target.telegram_id, (0, 0))
-            rating_lines.append(
-                f"{game_type_label(game_type)}: Elo {cr:.0f} (рейтинг {player.rating:.0f}, "
-                f"RD {player.rd:.0f}), W/L {wins}/{losses}"
-            )
+            rating_lines.append(f"{game_type_label(game_type)}: Elo {cr:.0f}, W/L {wins}/{losses}")
 
         matches = await get_user_matches(session, target.telegram_id, limit=5)
 

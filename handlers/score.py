@@ -34,14 +34,7 @@ def _elo(rating: float, rd: float) -> float:
 def _player_summary(mention: str, first_h, last_h) -> str:
     elo_before = _elo(first_h.rating_before, first_h.rd_before)
     elo_after = _elo(last_h.rating_after, last_h.rd_after)
-    d_rating = last_h.rating_after - first_h.rating_before
-    d_rd = last_h.rd_after - first_h.rd_before
-    return (
-        f"{mention}\n"
-        f"Elo {elo_before:.0f} → {elo_after:.0f} ({elo_after - elo_before:+.0f}) | "
-        f"рейтинг {first_h.rating_before:.0f} → {last_h.rating_after:.0f} ({d_rating:+.0f}) | "
-        f"RD {first_h.rd_before:.0f} → {last_h.rd_after:.0f} ({d_rd:+.0f})"
-    )
+    return f"{mention}: Elo {elo_before:.0f} → {elo_after:.0f} ({elo_after - elo_before:+.0f})"
 
 
 @router.message(Command("score"))
@@ -127,7 +120,6 @@ async def cmd_score(message: Message) -> None:
         "Партии: " + ", ".join(f"{m.score1}:{m.score2}" for m, _, _ in deltas),
         "",
         _player_summary(p1_mention, first_h1, last_h1),
-        "",
         _player_summary(p2_mention, first_h2, last_h2),
     ]
 

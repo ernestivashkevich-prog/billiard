@@ -17,7 +17,7 @@ async def _format_section(session: AsyncSession, game_type: str) -> str:
     ranked = await get_ranked_users(session, game_type)
     counts = await get_win_loss_counts_by_type(session, game_type)
 
-    lines = [f"🏆 {game_type_label(game_type)} (Elo = рейтинг − 2×RD):", ""]
+    lines = [f"🏆 {game_type_label(game_type)}:", ""]
     if not ranked:
         lines.append("Пока нет ни одного игрока в рейтинге.")
         return "\n".join(lines)
@@ -26,9 +26,7 @@ async def _format_section(session: AsyncSession, game_type: str) -> str:
         player = PlayerRating(rating=ur.rating, rd=ur.rd) if ur else PlayerRating()
         cr = conservative_rating(player)
         wins, losses = counts.get(u.telegram_id, (0, 0))
-        lines.append(
-            f"{i}. {u.display()} — Elo {cr:.0f} (рейтинг {player.rating:.0f}, RD {player.rd:.0f}) | W/L {wins}/{losses}"
-        )
+        lines.append(f"{i}. {u.display()} — Elo {cr:.0f} | W/L {wins}/{losses}")
 
     return "\n".join(lines)
 

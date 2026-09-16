@@ -137,6 +137,11 @@ async def get_ranked_users(session: AsyncSession, game_type: str) -> list[tuple[
     return sorted(rows, key=_cr, reverse=True)
 
 
+async def get_history_for_match(session: AsyncSession, match_id: int, user_id: int) -> RatingHistory | None:
+    stmt = select(RatingHistory).where(RatingHistory.match_id == match_id, RatingHistory.user_id == user_id)
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
 async def get_user_ratings(session: AsyncSession, user_id: int) -> dict[str, UserRating]:
     """Оба рейтинга игрока (Москва/Америка) по telegram_id."""
     stmt = select(UserRating).where(UserRating.user_id == user_id)

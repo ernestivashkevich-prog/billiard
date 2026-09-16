@@ -85,6 +85,13 @@ def _e(mu: float, mu_j: float, phi_j: float) -> float:
     return 1.0 / (1.0 + math.exp(-_g(phi_j) * (mu - mu_j)))
 
 
+def expected_win_probability(player: PlayerRating, opponent: PlayerRating) -> float:
+    """Вероятность победы ``player`` над ``opponent`` по рейтингам до матча (0..1)."""
+    mu, _ = _to_glicko2_scale(player.rating, player.rd)
+    mu_j, phi_j = _to_glicko2_scale(opponent.rating, opponent.rd)
+    return _e(mu, mu_j, phi_j)
+
+
 def _new_sigma(phi: float, sigma: float, delta: float, v: float, tau: float = TAU) -> float:
     """Шаг 5: итеративный поиск новой волатильности (алгоритм Иллинойс)."""
     a = math.log(sigma * sigma)
