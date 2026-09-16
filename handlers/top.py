@@ -26,9 +26,9 @@ async def cmd_top(message: Message) -> None:
         reverse=True,
     )
 
-    lines = ["🏆 Таблица лидеров (рейтинг − 2×RD):", ""]
+    lines = ["🏆 Таблица лидеров (Elo = рейтинг − 2×RD):", ""]
     for i, u in enumerate(ranked, start=1):
         cr = conservative_rating(PlayerRating(rating=u.rating, rd=u.rd, sigma=u.sigma))
-        lines.append(f"{i}. {u.display()} — {cr:.0f} (рейтинг {u.rating:.0f}, RD {u.rd:.0f})")
+        lines.append(f"{i}. {u.display()} — Elo {cr:.0f} (рейтинг {u.rating:.0f}, RD {u.rd:.0f})")
 
     await message.answer("\n".join(lines))
