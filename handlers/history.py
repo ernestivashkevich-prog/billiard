@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from models.db import session_scope
-from services.match_service import get_head_to_head
+from services.match_service import game_type_label, get_head_to_head
 from services.user_service import get_user, get_user_by_username
 
 router = Router(name="history")
@@ -48,7 +48,7 @@ async def cmd_history(message: Message) -> None:
         if my_score > opp_score:
             wins += 1
         date_str = m.confirmed_at.strftime("%d.%m.%Y") if m.confirmed_at else "?"
-        lines.append(f"{date_str}: {my_score}:{opp_score}")
+        lines.append(f"{date_str}: {game_type_label(m.game_type)} {my_score}:{opp_score}")
 
     lines.append("")
     lines.append(f"Итого: {wins}-{len(matches) - wins}")

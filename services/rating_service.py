@@ -12,9 +12,9 @@ from rating.glicko2 import DEFAULT_RATING, DEFAULT_RD, DEFAULT_SIGMA, PlayerRati
 async def rebuild_all_ratings(session: AsyncSession) -> None:
     """Полный пересчёт рейтингов всех игроков с нуля по истории confirmed-матчей.
 
-    Используется после /editmatch и /resolve — самый надёжный способ корректно
-    пересчитать "всю последующую историю" для затронутых игроков, не гадая,
-    какие именно матчи и в каком порядке нужно частично пересчитать.
+    Используется после /score, /cancel и /editmatch — самый надёжный способ
+    корректно пересчитать "всю последующую историю" для затронутых игроков,
+    не гадая, какие именно матчи и в каком порядке нужно частично пересчитать.
     Матчи внутри одной сессии /score применяются в порядке ``sequence``.
     """
     users_result = await session.execute(select(User))
@@ -84,24 +84,6 @@ def _days_between(last: datetime.datetime | None, now: datetime.datetime | None)
         return None
     delta = now - last
     return max(delta.total_seconds() / 86400.0, 0.0)
-
-
-async def confirm_session(session: AsyncSession, session_id: str, resolved_by: int | None = None) -> list[Match]:
-    """Подтверждает все матчи сессии и пересчитывает рейтинги."""
-    stmt = select(Match).where(Match.session_id == session_id).order_by(Match.sequence.asc())
-    result = await session.execute(stmt)
-    matches = list(result.scalars().all())
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-    for match in matches:
-        match.status = MatchStatus.CONFIRMED.value
-        match.confirmed_at = now
-        if resolved_by is not None:
-            match.resolved_by = resolved_by
-    await session.commit()
-
-    await rebuild_all_ratings(session)
-    return matches
 
 
 async def get_rating_deltas_for_session(session: AsyncSession, session_id: str) -> list[tuple[Match, RatingHistory, RatingHistory]]:

@@ -7,20 +7,9 @@ from aiogram.types import Message
 from models.db import session_scope
 from models.models import MatchStatus
 from services.audit_log import log_action
-from services.match_service import (
-    ScoreParseError,
-    get_match,
-    get_session_matches,
-    parse_score_pairs,
-)
+from services.match_service import ScoreParseError, get_match, parse_score_pairs
 from services.rating_service import rebuild_all_ratings
-from services.user_service import (
-    add_to_whitelist,
-    get_user,
-    get_user_by_username,
-    is_admin,
-    remove_from_whitelist,
-)
+from services.user_service import add_to_whitelist, is_admin, remove_from_whitelist
 
 router = Router(name="admin")
 
@@ -73,56 +62,6 @@ async def cmd_removeuser(message: Message) -> None:
         await message.answer(f"Игрок {telegram_id} удалён из списка участников. История матчей сохранена.")
     else:
         await message.answer("Такой игрок не найден.")
-
-
-@router.message(Command("resolve"))
-async def cmd_resolve(message: Message) -> None:
-    if not await _require_admin(message):
-        await message.answer("Команда доступна только администратору.")
-        return
-
-    args = message.text.split()[1:] if message.text else []
-    if len(args) < 2:
-        await message.answer(
-            "Формат: /resolve <session_id> confirm|cancel\n"
-            "confirm — подтвердить спорный результат как есть\n"
-            "cancel — отменить спорный матч (не будет учитываться)"
-        )
-        return
-
-    session_id, action = args[0], args[1].lower()
-    if action not in ("confirm", "cancel"):
-        await message.answer("Второй аргумент должен быть confirm или cancel.")
-        return
-
-    async with session_scope() as session:
-        matches = await get_session_matches(session, session_id)
-        if not matches:
-            await message.answer("Сессия матчей не найдена.")
-            return
-        if any(m.status != MatchStatus.DISPUTED.value for m in matches):
-            await message.answer("Эта сессия не в статусе «оспорено».")
-            return
-
-        import datetime
-
-        if action == "confirm":
-            now = datetime.datetime.now(datetime.timezone.utc)
-            for m in matches:
-                m.status = MatchStatus.CONFIRMED.value
-                m.confirmed_at = now
-                m.resolved_by = message.from_user.id
-        else:
-            for m in matches:
-                m.status = MatchStatus.CANCELLED.value
-                m.resolved_by = message.from_user.id
-        await session.commit()
-
-        if action == "confirm":
-            await rebuild_all_ratings(session)
-
-    log_action(message.from_user.id, "resolve", f"session_id={session_id} action={action}")
-    await message.answer(f"Спор по сессии {session_id} разрешён: {action}.")
 
 
 @router.message(Command("editmatch"))

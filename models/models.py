@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import enum
+import html
 
 from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -14,9 +15,7 @@ class Base(DeclarativeBase):
 
 
 class MatchStatus(str, enum.Enum):
-    PENDING = "pending"
     CONFIRMED = "confirmed"
-    DISPUTED = "disputed"
     CANCELLED = "cancelled"
 
 
@@ -49,6 +48,10 @@ class User(Base):
             return f"@{self.username}"
         return str(self.telegram_id)
 
+    def mention(self) -> str:
+        """HTML-ссылка на профиль пользователя (кликабельное упоминание в группе)."""
+        return f'<a href="tg://user?id={self.telegram_id}">{html.escape(self.display())}</a>'
+
 
 class Match(Base):
     __tablename__ = "matches"
@@ -60,17 +63,14 @@ class Match(Base):
 
     score1: Mapped[int] = mapped_column(Integer, nullable=False)
     score2: Mapped[int] = mapped_column(Integer, nullable=False)
+    game_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
-    status: Mapped[str] = mapped_column(String(16), default=MatchStatus.PENDING.value, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default=MatchStatus.CONFIRMED.value, nullable=False)
 
     session_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     sequence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # порядок партии внутри сессии
 
     reported_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=False)
-    resolved_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.telegram_id"), nullable=True)
-
-    reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    escalated: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     confirmed_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

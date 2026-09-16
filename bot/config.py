@@ -23,11 +23,9 @@ def _parse_admin_ids(raw: str | None) -> list[int]:
 @dataclass(frozen=True)
 class Settings:
     bot_token: str
-    group_chat_id: int | None
+    group_chat_id: int
     admin_ids: list[int] = field(default_factory=list)
     database_url: str = "sqlite+aiosqlite:///./data/billiard.db"
-    reminder_hours: int = 24
-    escalation_hours: int = 48
 
 
 @lru_cache
@@ -37,13 +35,16 @@ def get_settings() -> Settings:
         raise RuntimeError("BOT_TOKEN не задан в окружении (.env)")
 
     group_chat_id_raw = os.getenv("GROUP_CHAT_ID")
-    group_chat_id = int(group_chat_id_raw) if group_chat_id_raw else None
+    if not group_chat_id_raw:
+        raise RuntimeError(
+            "GROUP_CHAT_ID не задан в окружении (.env) — бот работает только "
+            "внутри одного группового чата, id обязателен."
+        )
+    group_chat_id = int(group_chat_id_raw)
 
     return Settings(
         bot_token=bot_token,
         group_chat_id=group_chat_id,
         admin_ids=_parse_admin_ids(os.getenv("ADMIN_IDS")),
         database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/billiard.db"),
-        reminder_hours=int(os.getenv("REMINDER_HOURS", "24")),
-        escalation_hours=int(os.getenv("ESCALATION_HOURS", "48")),
     )
