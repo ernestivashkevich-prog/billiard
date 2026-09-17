@@ -15,8 +15,10 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-# Стартовые значения нового игрока
-DEFAULT_RATING = 1500.0
+# Стартовые значения нового игрока.
+# DEFAULT_RATING подобран так, чтобы стартовый Elo (rating - 2*RD, см.
+# conservative_rating) был ровно 1000: 1700 - 2*350 = 1000.
+DEFAULT_RATING = 1700.0
 DEFAULT_RD = 350.0
 DEFAULT_SIGMA = 0.06
 
