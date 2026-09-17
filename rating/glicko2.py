@@ -17,16 +17,27 @@ from dataclasses import dataclass
 
 # Стартовые значения нового игрока.
 # DEFAULT_RATING подобран так, чтобы стартовый Elo (rating - 2*RD, см.
-# conservative_rating) был ровно 1000: 1700 - 2*350 = 1000.
-DEFAULT_RATING = 1700.0
-DEFAULT_RD = 350.0
+# conservative_rating) был ровно 1000: 1400 - 2*200 = 1000.
+DEFAULT_RATING = 1400.0
+DEFAULT_RD = 200.0
 DEFAULT_SIGMA = 0.06
 
 # Системная константа, ограничивающая волатильность
 TAU = 0.5
 
-# Максимально допустимый RD (не даём ему расти бесконечно у "уснувших" игроков)
-MAX_RD = 350.0
+# Максимально допустимый RD (не даём ему расти бесконечно у "уснувших" игроков).
+# Понижен с 350: чем меньше диапазон RD, тем меньше на итоговый рейтинг влияет
+# сама степень неопределённости — по запросу снизить "зависимость от RD".
+MAX_RD = 200.0
+
+# Верхний предел RD СОПЕРНИКА, который учитывается при расчёте "неожиданности"
+# результата (см. update_pair). Без этого потолка победа над непроверенным
+# новичком (у которого RD высокий просто потому, что он новичок) выглядит для
+# алгоритма куда более "неожиданной", чем победа над таким же по силе, но уже
+# проверенным игроком — и опытный игрок получает завышенный прирост Elo просто
+# за счёт того, что оппонент новый, а не потому что реально сильнее. Кэп не
+# трогает СОБСТВЕННЫЙ RD новичка — его личная калибровка идёт как обычно.
+OPPONENT_RD_CAP = 80.0
 
 # Один "рейтинговый период" Glicko-2 = 1 день (см. п.7 ТЗ)
 RATING_PERIOD_DAYS = 1.0
@@ -87,11 +98,20 @@ def _e(mu: float, mu_j: float, phi_j: float) -> float:
     return 1.0 / (1.0 + math.exp(-_g(phi_j) * (mu - mu_j)))
 
 
+def _capped_opponent_phi(phi_j: float) -> float:
+    return min(phi_j, OPPONENT_RD_CAP / _Q)
+
+
 def expected_win_probability(player: PlayerRating, opponent: PlayerRating) -> float:
-    """Вероятность победы ``player`` над ``opponent`` по рейтингам до матча (0..1)."""
+    """Вероятность победы ``player`` над ``opponent`` по рейтингам до матча (0..1).
+
+    Использует тот же кэп RD соперника, что и реальный пересчёт в update_pair —
+    иначе /details объяснял бы матч по формуле, которая не совпадает с тем, что
+    на самом деле было применено.
+    """
     mu, _ = _to_glicko2_scale(player.rating, player.rd)
     mu_j, phi_j = _to_glicko2_scale(opponent.rating, opponent.rd)
-    return _e(mu, mu_j, phi_j)
+    return _e(mu, mu_j, _capped_opponent_phi(phi_j))
 
 
 def _new_sigma(phi: float, sigma: float, delta: float, v: float, tau: float = TAU) -> float:
@@ -143,7 +163,8 @@ def update_pair(
     player = apply_rd_time_decay(player, days_since_player_last_match)
 
     mu, phi = _to_glicko2_scale(player.rating, player.rd)
-    mu_j, phi_j = _to_glicko2_scale(opponent.rating, opponent.rd)
+    mu_j, phi_j_raw = _to_glicko2_scale(opponent.rating, opponent.rd)
+    phi_j = _capped_opponent_phi(phi_j_raw)
 
     g_j = _g(phi_j)
     e_val = _e(mu, mu_j, phi_j)
