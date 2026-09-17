@@ -15,7 +15,8 @@ from services.match_service import (
     parse_game_type,
     parse_score_pairs,
 )
-from services.rating_service import get_rating_deltas_for_session, rebuild_all_ratings
+from services.leaderboard_alerts import detect_top3_changes
+from services.rating_service import get_ranked_users, get_rating_deltas_for_session, rebuild_all_ratings
 from services.user_service import get_user_by_username
 
 router = Router(name="score")
@@ -95,6 +96,8 @@ async def cmd_score(message: Message) -> None:
             await message.answer("Нельзя заявить матч игрока самому с собой 🙂")
             return
 
+        before_top = await get_ranked_users(session, game_type)
+
         matches = await create_score_session(
             session, reporter_tg.id, player1, player2, game_type, pairs
         )
@@ -102,6 +105,9 @@ async def cmd_score(message: Message) -> None:
 
         await rebuild_all_ratings(session)
         deltas = await get_rating_deltas_for_session(session, session_id)
+
+        after_top = await get_ranked_users(session, game_type)
+        overtakes = detect_top3_changes(before_top, after_top, game_type_label(game_type))
 
         p1_mention, p2_mention = player1.mention(), player2.mention()
 
@@ -124,3 +130,6 @@ async def cmd_score(message: Message) -> None:
     ]
 
     await message.answer("\n".join(lines))
+
+    if overtakes:
+        await message.answer("\n\n".join(overtakes))
