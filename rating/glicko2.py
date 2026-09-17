@@ -188,3 +188,16 @@ def update_match(
 def conservative_rating(player: PlayerRating) -> float:
     """rating - 2*RD — консервативная оценка силы игрока для сортировки /top."""
     return player.rating - 2.0 * player.rd
+
+
+def format_signed(value: float) -> str:
+    """Изменение рейтинга/Elo со знаком, например "+7" или "-3".
+
+    round(-0.3) даёт -0.0, а f"{-0.0:+.0f}" печатает "-0" — что выглядит как
+    баг ("проиграл, а Elo не изменился, но почему-то со знаком минус").
+    Явно нормализуем такие случаи в "0" без знака.
+    """
+    rounded = round(value)
+    if rounded == 0:
+        return "0"
+    return f"{rounded:+d}"

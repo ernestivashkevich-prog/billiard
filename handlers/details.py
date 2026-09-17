@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from models.db import session_scope
-from rating.glicko2 import PlayerRating, conservative_rating, expected_win_probability
+from rating.glicko2 import PlayerRating, conservative_rating, expected_win_probability, format_signed
 from services.match_service import game_type_label, get_user_matches
 from services.rating_service import get_history_for_match
 from services.user_service import get_user
@@ -68,7 +68,7 @@ async def cmd_details(message: Message) -> None:
         f"{opp_name} — рейтинг {h_opp.rating_before:.0f}, RD {h_opp.rd_before:.0f}\n\n"
         f"Ваш ожидаемый шанс на победу (по рейтингу до матча): {win_prob:.0%}\n"
         f"{verdict}\n\n"
-        f"Elo: {elo_before:.0f} → {elo_after:.0f} ({elo_delta:+.0f})\n"
+        f"Elo: {elo_before:.0f} → {elo_after:.0f} ({format_signed(elo_delta)})\n"
         f"Чем выше был ваш RD ({h_me.rd_before:.0f}) и чем неожиданнее результат — тем сильнее "
         f"меняется рейтинг за один матч."
     )

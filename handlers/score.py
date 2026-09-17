@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from models.db import session_scope
-from rating.glicko2 import PlayerRating, conservative_rating
+from rating.glicko2 import PlayerRating, conservative_rating, format_signed
 from services.audit_log import log_action
 from services.match_service import (
     ScoreParseError,
@@ -35,7 +35,7 @@ def _elo(rating: float, rd: float) -> float:
 def _player_summary(mention: str, first_h, last_h) -> str:
     elo_before = _elo(first_h.rating_before, first_h.rd_before)
     elo_after = _elo(last_h.rating_after, last_h.rd_after)
-    return f"{mention}: Elo {elo_before:.0f} → {elo_after:.0f} ({elo_after - elo_before:+.0f})"
+    return f"{mention}: Elo {elo_before:.0f} → {elo_after:.0f} ({format_signed(elo_after - elo_before)})"
 
 
 @router.message(Command("score"))
